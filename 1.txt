@@ -1,0 +1,114 @@
+fixed<-function(a0,tol=1E-6,max.iter=100,x,y)
+{
+n<-length(x)
+m<-length(y)
+aold<-a0
+anew<-(m+n+sum(log(x^aold))+sum(log(y^aold)))/(sum(x^aold*log(x))/mean(x^aold)+sum(y^aold*log(y))/mean(y^aold))
+iter<-1
+while ((abs(anew - aold) > tol) && (iter < max.iter)){
+      aold <- anew
+     anew<-(m+n+sum(log(x^aold))+sum(log(y^aold)))/(sum(x^aold*log(x))/mean(x^aold)+sum(y^aold*log(y))/mean(y^aold))
+      iter <- iter + 1
+}
+R<-mean(x^anew)/(mean(x^anew)+mean(y^anew))
+return(R)
+}
+##########################
+log.lik1<-function(theta,x,y){
+n<-length(x)
+m<-length(y)
+ln<-(n+m)*log(theta[1])-n*log(theta[2])-m*log(theta[3])+(theta[1]-1)*(sum(log(x))+sum(log(y)))-sum(x^theta[1])/theta[2]-sum(y^theta[1])/theta[3]
+return(-ln)
+}
+#########################
+
+AMLE<-function(x,y){
+n<-length(x)
+m<-length(y)
+orderx<-sort(x)
+ordery<-sort(y)
+
+
+orderU<-log(orderx)
+orderV<-log(ordery)
+
+
+
+q<-1-(1:n)/(n+1)
+
+ai<-1+log(q)*(1-log(-log(q)))
+bi<--log(q)
+
+
+
+qbar<-1-(1:m)/(m+1)
+aibar<-1+log(qbar)*(1-log(-log(qbar)))
+bibar<--log(qbar)
+
+
+
+
+A1<-sum(bi*orderU)/sum(bi)
+A2<-sum(bibar*orderV)/sum(bibar)
+B1<-sum(ai)/sum(bi)
+B2<-sum(aibar)/sum(bibar)
+C<-m+n
+D<-sum(ai*(orderU-A1))-2*B1*sum(bi*(orderU-A1))+sum(aibar*(orderV-A2))-2*B2*sum(bibar*(orderV-A2))
+E<-sum(bi*(orderU-A1)^2)+sum(bibar*(orderV-A2)^2)
+
+
+
+
+sigmatilde<-(-D+sqrt(D^2+4*E*(m+n)))/(2*(m+n))
+
+
+alphatilde<-1/sigmatilde
+thetatilde1<-exp((A1-B1*sigmatilde)/sigmatilde)
+thetatilde2<-exp((A2-B2*sigmatilde)/sigmatilde)
+return(thetatilde1/(thetatilde1+thetatilde2))
+}
+##############################################
+
+
+twoestimators<-function(d1,d2){
+R1<-fixed(1,tol=1E-10,max.iter=100,d1,d2)
+R1
+####################
+res1<-optim(c(1,1,1),log.lik1,method="L-BFGS-B",lower=c(0.1,0.1,0.1),x=d1,y=d2,hessian=T,control=list(trace=F,maxit=1000))
+R2<-res1$par[2]/(res1$par[2]+res1$par[3])
+R2
+##############################
+
+R3<-AMLE(d1,d2)
+R3
+out<-c(R1,R2,R3)
+return(out)
+}
+
+##############################
+alpha<-2
+theta1<-1
+theta2<-3
+n<-20
+m<-25
+simulation<-1000
+
+nnn <- NULL  #####matrix
+   for(i in 1:simulation) { 
+datax<-rweibull(n,alpha,theta1^(1/alpha))
+datay<-rweibull(m,alpha,theta2^(1/alpha))
+ nnn <- rbind(nnn, twoestimators(datax,datay))
+   }
+
+bias1 <- apply(nnn,2,mean) - theta1/(theta1+theta2)
+var1 <- apply(nnn,2,var) * ((simulation-1)/simulation)
+mse1 <- bias1^2 + var1
+rbind(bias1, mse1)
+
+
+
+
+
+
+
+
